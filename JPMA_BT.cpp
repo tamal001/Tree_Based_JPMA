@@ -21,8 +21,6 @@ PMA::PMA(){
     lastElementPos.push_back(0);                             //Position of last element in the segment
     elementsInSegment = SEGMENT_SIZE/sizeof(type_t);
     lastValidPos = elementsInSegment - 1;
-    MaxThreshold = (elementsInSegment*90)/100;
-    MinThreshold = (elementsInSegment*10)/100;
     blocksInSegment = elementsInSegment / JacobsonIndexSize;
     freeSegmentCount = 0;
     type_t *starting_key_chunk, *starting_value_chunk;
@@ -345,7 +343,6 @@ void PMA::insertInPosition(type_t position, int targetSegment, type_t key, type_
     bitmap[targetSegment][blockPosition] |= mask;
     cardinality[targetSegment]++;
     if(lastElementPos[targetSegment] < position) lastElementPos[targetSegment] = position;
-    //if(cardinality[targetSegment] > MaxThreshold) redistribute(targetSegment, INSERT);
 }
 
 bool PMA::remove(type_t key){
@@ -371,7 +368,6 @@ void PMA::deleteInPosition(type_t position, int targetSegment, type_t key){
     }
 
     //Will be handled later
-    //if(cardinality[targetSegment] < MinThreshold) redistribute(targetSegment, DELETE);
 }
 
 void PMA::deleteSegment(int targetSegment){
@@ -513,6 +509,363 @@ void PMA::printAllElements(){
     tree->printAllElements(this);
 }
 
+tuple<type_t, type_t> PMA::range_sum(type_t startKey, type_t endKey){
+    int targetSegment = searchSegment(startKey);
+
+    type_t position = findLocation(startKey, targetSegment);
+    type_t sum_key = 0, sum_value = 0;
+    type_t blockNo = position/JacobsonIndexSize;
+    u_char * ar = NonZeroEntries[bitmap[targetSegment][blockNo]];
+    type_t * segmentKeyOffset = key_chunks[targetSegment];
+    type_t * segmentValOffset = value_chunks[targetSegment];
+    type_t pbase = blockNo * JacobsonIndexSize;
+
+    //Range starts somewhere within this block
+    bool flag = false;
+    for(int offset = 1; offset <= ar[0] ; offset++){
+        type_t key = *(segmentKeyOffset+pbase+ar[offset]);
+        if(flag && key > endKey) flag = false;
+        else if(!flag && key >= startKey) flag = true;
+        if(flag) {
+            sum_key += key;
+            sum_value += *(segmentValOffset+pbase+ar[offset]);
+        }
+    }
+
+    type_t * key_pos, *value_pos;
+    int offset;
+    while(LIKELY(true)){
+        pbase += JacobsonIndexSize;
+        blockNo++;
+        if(blockNo == blocksInSegment){
+            blockNo = 0;
+            pbase = 0;
+            targetSegment++;
+            if(UNLIKELY(targetSegment == totalSegments)) return {sum_key, sum_value};
+            segmentKeyOffset = key_chunks[targetSegment];
+            segmentValOffset = value_chunks[targetSegment];
+        }
+        ar = NonZeroEntries[bitmap[targetSegment][blockNo]];
+        key_pos = segmentKeyOffset + pbase;
+        value_pos = segmentValOffset + pbase;
+        offset = ar[0];
+        switch (offset){
+            case 1:
+                sum_key += *(key_pos + ar[1]);
+                sum_value += *(value_pos + ar[1]);
+                break;
+            case 2:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                break;
+            case 3:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                break;
+            case 4:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                break;
+            case 5:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                break;
+            case 6:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                break;
+            case 7:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                break;
+            case 8:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                break;
+            case 9:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                break;
+            case 10:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                break;
+            case 11:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_key += *(key_pos + ar[11]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                sum_value += *(value_pos + ar[11]);
+                break;
+            case 12:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_key += *(key_pos + ar[11]);
+                sum_key += *(key_pos + ar[12]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                sum_value += *(value_pos + ar[11]);
+                sum_value += *(value_pos + ar[12]);
+                break;
+            case 13:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_key += *(key_pos + ar[11]);
+                sum_key += *(key_pos + ar[12]);
+                sum_key += *(key_pos + ar[13]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                sum_value += *(value_pos + ar[11]);
+                sum_value += *(value_pos + ar[12]);
+                sum_value += *(value_pos + ar[13]);
+                break;
+            case 14:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_key += *(key_pos + ar[11]);
+                sum_key += *(key_pos + ar[12]);
+                sum_key += *(key_pos + ar[13]);
+                sum_key += *(key_pos + ar[14]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                sum_value += *(value_pos + ar[11]);
+                sum_value += *(value_pos + ar[12]);
+                sum_value += *(value_pos + ar[13]);
+                sum_value += *(value_pos + ar[14]);
+                break;
+            case 15:
+                sum_key += *(key_pos + ar[1]);
+                sum_key += *(key_pos + ar[2]);
+                sum_key += *(key_pos + ar[3]);
+                sum_key += *(key_pos + ar[4]);
+                sum_key += *(key_pos + ar[5]);
+                sum_key += *(key_pos + ar[6]);
+                sum_key += *(key_pos + ar[7]);
+                sum_key += *(key_pos + ar[8]);
+                sum_key += *(key_pos + ar[9]);
+                sum_key += *(key_pos + ar[10]);
+                sum_key += *(key_pos + ar[11]);
+                sum_key += *(key_pos + ar[12]);
+                sum_key += *(key_pos + ar[13]);
+                sum_key += *(key_pos + ar[14]);
+                sum_key += *(key_pos + ar[15]);
+                sum_value += *(value_pos + ar[1]);
+                sum_value += *(value_pos + ar[2]);
+                sum_value += *(value_pos + ar[3]);
+                sum_value += *(value_pos + ar[4]);
+                sum_value += *(value_pos + ar[5]);
+                sum_value += *(value_pos + ar[6]);
+                sum_value += *(value_pos + ar[7]);
+                sum_value += *(value_pos + ar[8]);
+                sum_value += *(value_pos + ar[9]);
+                sum_value += *(value_pos + ar[10]);
+                sum_value += *(value_pos + ar[11]);
+                sum_value += *(value_pos + ar[12]);
+                sum_value += *(value_pos + ar[13]);
+                sum_value += *(value_pos + ar[14]);
+                sum_value += *(value_pos + ar[15]);
+                break;
+            case 16:
+                sum_key += *key_pos;
+                sum_key += *(key_pos + 1);
+                sum_key += *(key_pos + 2);
+                sum_key += *(key_pos + 3);
+                sum_key += *(key_pos + 4);
+                sum_key += *(key_pos + 5);
+                sum_key += *(key_pos + 6);
+                sum_key += *(key_pos + 7);
+                sum_key += *(key_pos + 8);
+                sum_key += *(key_pos + 9);
+                sum_key += *(key_pos + 10);
+                sum_key += *(key_pos + 11);
+                sum_key += *(key_pos + 12);
+                sum_key += *(key_pos + 13);
+                sum_key += *(key_pos + 14);
+                sum_key += *(key_pos + 15);
+                sum_value += *value_pos;
+                sum_value += *(value_pos + 1);
+                sum_value += *(value_pos + 2);
+                sum_value += *(value_pos + 3);
+                sum_value += *(value_pos + 4);
+                sum_value += *(value_pos + 5);
+                sum_value += *(value_pos + 6);
+                sum_value += *(value_pos + 7);
+                sum_value += *(value_pos + 8);
+                sum_value += *(value_pos + 9);
+                sum_value += *(value_pos + 10);
+                sum_value += *(value_pos + 11);
+                sum_value += *(value_pos + 12);
+                sum_value += *(value_pos + 13);
+                sum_value += *(value_pos + 14);
+                sum_value += *(value_pos + 15);
+        }
+        if(*(key_pos + ar[offset]) > endKey){
+            while(offset > 0 && *(key_pos + ar[offset]) > endKey){
+                sum_key -= *(key_pos + ar[offset]);
+                sum_value -= *(value_pos + ar[offset]);
+                offset--;
+            }
+		    return {sum_key, sum_value};
+	    }
+    }
+    return {sum_key, sum_value};
+}
+
 void PMA::printSegElements(int targetSegment){
     type_t * key = key_chunks[targetSegment];
     type_t pBase = 0;
@@ -599,13 +952,6 @@ void BPlusTree::insertInTree(int chunkNo, type_t search_key, PMA *obj){
                     leaf->key[position] = search_key;
                 }
                 leaf->childCount++;
-                /*
-                if(leaf->childCount > Leaf_Degree){
-                    cout<<"Got more child than limit: 1"<<endl;
-                    cout<<"Leaf childcount: "<<leaf->childCount<<endl;
-                    exit(0);
-                }
-                */
                 return;
             }
         }
@@ -619,16 +965,8 @@ void BPlusTree::insertInTree(int chunkNo, type_t search_key, PMA *obj){
             leaf->key[0] = search_key;
         }
         leaf->childCount++;
-        /*
-        if(leaf->childCount > Leaf_Degree){
-            cout<<"Got more child than limit: 2"<<endl;
-            cout<<"Leaf childcount: "<<leaf->childCount<<endl;
-            exit(0);
-        }
-        */
         return;
     }
-    //if(leaf->childCount < Leaf_Degree){cout<<"Progrom should not have reached here: InsertInTree"<<endl; exit(0);}
     //Leaf is not empty. Divide.
     //Copy the key-value pairs
     type_t key_store[Leaf_Degree+1];
@@ -685,18 +1023,6 @@ void BPlusTree::insertInTree(int chunkNo, type_t search_key, PMA *obj){
     }
     leaf->childCount = Leaf_Degree/2 + 1;
     l2->childCount = Leaf_Degree + 1 - leaf->childCount;
-    /*
-    if(leaf->childCount > Leaf_Degree){
-        cout<<"Got more child than limit: 3"<<endl;
-        cout<<"Leaf childcount: "<<leaf->childCount<<endl;
-        exit(0);
-    }
-    if(l2->childCount > Leaf_Degree){
-        cout<<"Got more child than limit: 4"<<endl;
-        cout<<"Leaf childcount: "<<l2->childCount<<endl;
-        exit(0);
-    }
-    */
     l2->nextLeaf = leaf->nextLeaf;
     leaf->nextLeaf = l2;
     type_t key_parent = obj->smallest[leaf->segNo[0]];
@@ -729,16 +1055,6 @@ void BPlusTree::insert_in_parent(void *left, type_t search_key, void *right, typ
         cout<<"Program should never reach here. Insert in Parent node of B+ Tree"<<endl;
         exit(0);
     }
-    /*
-    if(N->ptrCount>Tree_Degree){
-        cout<<"Non Leaf node has more children than tree degree"<<endl;
-        vector<node *> temp;
-        temp.push_back(root);
-        treeLevel = leafCount = 0;
-        printTree(temp, 1);
-        exit(0);
-    }
-    */
     type_t key_store[Tree_Degree+1];
     Node *ptr_store[Tree_Degree+1];
     int position;
@@ -1197,15 +1513,6 @@ int PMA:: redistributeWithDividing(int targetSegment){
 type_t BPlusTree::findCardinality(leaf *l, PMA *obj){
     type_t total = 0;
     for(int i=0; i<l->childCount; i++){
-        /*
-        if(l->childCount>Leaf_Degree){
-            vector<node *> temp;
-            temp.push_back(root);
-            treeLevel = leafCount = 0;
-            printTree(temp,1);
-            exit(0);
-        }
-        */
         total += obj->cardinality[l->segNo[i]];
     }
     return total;
@@ -1214,15 +1521,6 @@ type_t BPlusTree::findCardinality(leaf *l, PMA *obj){
 type_t BPlusTree::findCardinality(node *n, PMA *obj){
     type_t total = 0;
     for(int i=0; i < n->ptrCount; i++){
-        /*
-        if(n->ptrCount>Tree_Degree){
-            vector<node *> temp;
-            temp.push_back(root);
-            treeLevel = leafCount = 0;
-            printTree(temp, 1);
-            exit(0);
-        }
-        */
         if(n->nodeLeaf) total += findCardinality((leaf *)n->child_ptr[i], obj);
         else total += findCardinality(n->child_ptr[i], obj);
     }
@@ -1263,7 +1561,7 @@ void BPlusTree::printTree(vector<Node *> nodes, int level){
         vector<Leaf *> list;
         for(u_int i=0; i<nodes.size(); i++){
             Node *temp = nodes[i];
-            cout<<"Child:- "<<temp->ptrCount<<"::";
+            cout<<"Child:- "<<(int)temp->ptrCount<<"::";
             for(int j=0; j<temp->ptrCount; j++){
                 cout<<" "<<temp->child_ptr[j];
                 if(j<temp->ptrCount-1) cout<<" "<<temp->key[j];
@@ -1283,7 +1581,7 @@ void BPlusTree::printTree(vector<Node *> nodes, int level){
         vector<Node *> list;
         for(u_int i=0; i<nodes.size(); i++){
             Node *temp = nodes[i];
-            cout<<"Child:- "<<temp->ptrCount<<"::";
+            cout<<"Child:- "<<(int) temp->ptrCount<<"::";
             for(int j=0; j<temp->ptrCount; j++){
                 cout<<" "<<temp->child_ptr[j];
                 if(j<temp->ptrCount-1) cout<<" "<<temp->key[j];
@@ -1300,7 +1598,7 @@ void BPlusTree::printTree(vector<Leaf *> nodes, int level){
     cout<<"Printing level: "<<level<<endl;
     for(u_int i=0; i<nodes.size(); i++){
         Leaf *temp = nodes[i];
-        cout<<"child:- "<<temp->childCount<<"::";
+        cout<<"child:- "<<(int)temp->childCount<<"::";
         for(int j=0; j<temp->childCount; j++){
             cout<<" "<<temp->segNo[j];
             if(j<temp->childCount-1) cout<<" "<<temp->key[j];

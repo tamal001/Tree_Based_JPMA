@@ -124,7 +124,19 @@ int main(int argc, char **argv){
     }
     stop = chrono::high_resolution_clock::now();
     int64_t searchDelay = chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    cout<<"Searched elements in "<<searchDelay<<" microSeconds"<<endl;
-    //pma.printAllElements();
+    cout<<"Searched "<<totalSearch<<" elements in "<<searchDelay<<" microSeconds."<<endl;
+    
+    //Range Scan in the PMA
+    type_t startRange = rand()%(totalInsert - rangeLength);
+    type_t sum_key, sum_value;
+    start = chrono::high_resolution_clock::now();
+    tie(sum_key, sum_value) = pma.range_sum(startRange, startRange+rangeLength);
+    stop = chrono::high_resolution_clock::now();
+    if(sum_key*10 != sum_value){
+        cout<<"Error in range scan!"<<endl;
+        exit(0);
+    }
+    int64_t scanDelay = chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    cout<<"Scanned elements with range "<<rangeLength<<" in " <<scanDelay<<" microSeconds."<<endl;
     return 0;
 }

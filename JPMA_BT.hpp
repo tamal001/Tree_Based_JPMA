@@ -15,7 +15,7 @@ public:
     typedef struct Leaf{
         type_t key[Leaf_Degree-1];
         int segNo[Leaf_Degree];
-        short childCount;
+        char childCount;
         Leaf *nextLeaf;
         Leaf() : childCount(0), nextLeaf(NULL) {}
     }leaf;
@@ -25,7 +25,7 @@ public:
         type_t key[Tree_Degree-1];
         Node *child_ptr[Tree_Degree];
         bool nodeLeaf; //Last non-leaf node has value true
-        short ptrCount;
+        char ptrCount;
         Node() : ptrCount(0), nodeLeaf(false){}
     }node;
     node *root;
@@ -57,8 +57,6 @@ public:
 
 class PMA{
 public:
-    type_t MaxThreshold;
-    type_t MinThreshold;
     vector<type_t *> key_chunks;
     vector<type_t *> value_chunks;
     vector<type_t> smallest;
@@ -84,7 +82,7 @@ public:
     bool insert(type_t key, type_t value, int count= 0);
     bool remove(type_t key);
     bool lookup(type_t key);
-    type_t range_sum(type_t startKey, type_t endKey);
+    tuple<type_t, type_t> range_sum(type_t startKey, type_t endKey);
 
     //Support functions
     int searchSegment(type_t key);
@@ -100,9 +98,6 @@ public:
     type_t findLocation(type_t key, int targetSegment);
     type_t findLocation1(type_t key, int targetSegment);
     type_t findLocation2(type_t key, int targetSegment);
-    //void redistribute(int targetSegment, redistribution type);
-    //void redistributeWithPrev(int targetSegment);
-    //void redistributeWithNext(int targetSegment);
     int redistributeWithDividing(int targetSegment);
     void swapElements(type_t targetSegment, type_t position, type_t adjust);
 
